@@ -53,19 +53,29 @@ def send_message_to_channel(channelId, message):
     requests.post(url, json=data, headers=headers)
 
 def region_update(Data, Region_Name):
+    # Get Online players  
+    online_players = []
+    for player in Data[Region_Name]["onlinePlayers"]:
+        online_players.append(player["Name"])
+
+    # Check for players in PvP area 
     for player in Data[Region_Name]["hunterBoard"]:
         # Check if player is in PvP area
         if player["Playfield"] in PvP_Playfields:
-            # Try getting players old location
-            value = table.get_item(Key={"Server": Region_Name, "PlayerName": player["Name"]})
-            if "Item" in value:
-                old_location = value.get('Item').get('Location')
-                # Check if player switched locations
-                if old_location != player["Playfield"]:
-                    add_message(player["Name"], player["Playfield"])
-            # Player was not in database
+            # Check if player is online
+            if player["Name"] not in online_players:
+                player['Playfield'] = "Offline"
             else:
-                add_message(player["Name"], player["Playfield"])
+                # Try getting players old location
+                value = table.get_item(Key={"Server": Region_Name, "PlayerName": player["Name"]})
+                if "Item" in value:
+                    old_location = value.get('Item').get('Location')
+                    # Check if player switched locations
+                    if old_location != player["Playfield"]:
+                        add_message(player["Name"], player["Playfield"])
+                # Player was not in database
+                else:
+                    add_message(player["Name"], player["Playfield"])
         table.put_item(Item={'Server': Region_Name,'PlayerName': player["Name"],'Location': player["Playfield"]})
        
 
