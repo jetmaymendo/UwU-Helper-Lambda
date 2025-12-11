@@ -38,6 +38,7 @@ PvP_Playfields = ["Phoenix",
 
 PvP_Message = ""
 
+
 # Append message to PvP_Message
 def add_message(Player_Name, Playfield_Name):
     message = f"Player {Player_Name} has entered {Playfield_Name}!\n "
@@ -58,6 +59,7 @@ def region_update(Data, Region_Name):
     for player in Data[Region_Name]["onlinePlayers"]:
         online_players.append(player["Name"])
 
+    newLocations = []
     # Check for players in PvP area 
     for player in Data[Region_Name]["hunterBoard"]:
         # Check if player is in PvP area
@@ -76,19 +78,55 @@ def region_update(Data, Region_Name):
                 # Player was not in database
                 else:
                     add_message(player["Name"], player["Playfield"])
-        table.put_item(Item={'Server': Region_Name,'PlayerName': player["Name"],'Location': player["Playfield"]})
+        # Add new locations to temporary array, so they can be updated with batch later            
+        newLocations.append({'Server': Region_Name,'PlayerName': player["Name"],'Location': player["Playfield"]})
+        
+    # Update locations in database    
+    RequestItems={'UwUHelper_HunterBoardLocations': []}
+    for index, item in enumerate(newLocations):
+        RequestItems['UwUHelper_HunterBoardLocations'].append({'PutRequest': {'Item': item}})
+        if (index + 1)%25 == 0:
+            dynamodb.batch_write_item(RequestItems=RequestItems, ReturnConsumedCapacity='NONE', ReturnItemCollectionMetrics='NONE')
+            RequestItems['UwUHelper_HunterBoardLocations'] = []
+    if RequestItems['UwUHelper_HunterBoardLocations']:
+        dynamodb.batch_write_item(RequestItems=RequestItems, ReturnConsumedCapacity='NONE', ReturnItemCollectionMetrics='NONE')
        
+def send_message_to_bot_channels(message):
+    channels = [1434584925163491469, 1434585294144929913]
+    for channel in channels:
+        send_message_to_channel(channel, message)
 
 def main_tick():
+    # Check if Session ID was valid last time
+    was_id_valid = True
+    value = table.get_item(Key={"Server": "var", "PlayerName": "ValidID"})
+    if "Item" in value:
+        was_id_valid = value.get('Item').get('Value')
+    if not was_id_valid:
+        # Get PHP Session ID again, if last time it was invalid
+        global SESSION_ID
+        secret = client.get_secret_value(SecretId="PHP-Session-ID")
+        SESSION_ID = json.loads(secret["SecretString"])["PHP_SESSION_ID"]
+
+    # Grab player data from HWS Connect
     resp = requests.get("https://empyrion-homeworld.net/re/hws-connect/api/user.php?onlinePlayers", cookies={"PHPSESSID": SESSION_ID})
-    json_data = resp.json()
+    json_data = resp.json()   
+
     # Check for error in response
     if "error" in json_data:
+        if was_id_valid:
+            send_message_to_bot_channels("**I cannot work now, because I'm having identity crysis, sowwy >_<**")
+            table.put_item(Item={"Server": "var", "PlayerName": "ValidID", "Value": False})
         print("Wrong Session ID")
         return
 
-    global PvP_Message
+    if not was_id_valid:
+        send_message_to_bot_channels("**I'm back to work now, thanks for the break UwU**")
+        table.put_item(Item={"Server": "var", "PlayerName": "ValidID", "Value": True})
+        print("Session ID is valid again")
 
+    global PvP_Message
+    
     # Update EU
     PvP_Message = ""
     region_update(json_data, "re")
