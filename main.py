@@ -41,7 +41,7 @@ PvP_Message = ""
 
 # Append message to PvP_Message
 def add_message(Player_Name, Playfield_Name):
-    message = f"Player {Player_Name} has entered {Playfield_Name}!\n "
+    message = f"Player {Player_Name} has entered {Playfield_Name}!\n"
     global PvP_Message
     PvP_Message += message
 
@@ -109,7 +109,8 @@ def main_tick():
         SESSION_ID = json.loads(secret["SecretString"])["PHP_SESSION_ID"]
 
     # Grab player data from HWS Connect
-    resp = requests.get("https://empyrion-homeworld.net/re/hws-connect/api/user.php?onlinePlayers", cookies={"PHPSESSID": SESSION_ID})
+    resp = requests.get("https://empyrion-homeworld.net/re/hws-connect/api/user.php?onlinePlayers", cookies ={"PHPSESSID": SESSION_ID}, 
+    headers = {"Referer": "https://empyrion-homeworld.net/re/hws-connect.html"})
     json_data = resp.json()   
 
     # Check for error in response
