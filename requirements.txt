@@ -1,3 +1,5 @@
 requests
 boto3
 pynacl
+# selenium      - for cookie_grabber
+# python-dotenv - for cookie_grabber
